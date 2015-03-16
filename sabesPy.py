@@ -1,19 +1,21 @@
 
 # coding: utf-8
 
-
 def getData(date):
-    """recebe um objeto date ou uma string com a data no
-    formato YYYY-MM-DD e retorna uma 'Série' (do pacote pandas)
-    com os níveis dos reservatórios da sabesp"""
-
+    """recebe um objeto date ou uma string com a data no 
+    formato YYYY-MM-DD e retorna uma 'SÃ©rie' (do pacote pandas)
+    com os nÃ­veis dos reservatÃ³rios da sabesp"""
     fixPercent = lambda s: float(s.replace(",",".").replace("%",""))
 
     import datetime
     if type(date) == datetime.date:
         date = date.isoformat()
 
-    ## requisição
+    ## vamos ser educados e nao fazer taaaaantas requisiÃ§Ãµes de uma vez
+    from time import sleep
+    sleep(1)
+
+    ## requisiÃ§Ã£o
     import urllib.request
     req = urllib.request.urlopen("https://sabesp-api.herokuapp.com/" + date).read().decode()
 
@@ -29,6 +31,69 @@ def getData(date):
     return pd.Series(dados, index=sistemas, name=date)
 
 
+def percFixer(p,volMax,volumeMorto=0):
+    volAtual = volMax*(p/100) - volumeMorto
+    q = 100*volAtual/volMax
+    #import numpy as np
+    q = round(q,1)
+    return q
+
+
+def fixPerc(p, data, log=True, sistema='Cantareira', fixFunc=percFixer):
+    """corrige o percentual divulgado pela sabesp"""
+
+    def str2date(data, format='%Y-%m-%d'):
+        """converte uma string contendo uma data e retorna um objeto date"""
+        import datetime as dt
+        return dt.datetime.strptime(data,format)
+    
+    if log:
+        def decora(f):
+            def printLog(a,*args,**kwargs):
+                b = f(a,*args, **kwargs)
+                if 'volumeMorto' in kwargs:
+                    print('%s: %5.1f ===> %5.1f  VOLUME MORTO %5.1f GL' % (data, a, b, kwargs['volumeMorto']))
+                else:
+                    print('%s: %5.1f ===> %5.1f' % (data, a, b))
+                return b
+            return printLog
+        fixFunc = decora(fixFunc)
+            
+    if sistema == 'Cantareira':
+        vm1day = str2date('16/05/2014', format='%d/%m/%Y')
+        vm2day = str2date('24/10/2014', format='%d/%m/%Y')
+
+        vm1 = 182.5
+        vm2 = 105.4
+        capacity = 982.07
+
+        if str2date(data) < vm1day:
+            return fixFunc(p, capacity)
+
+        elif str2date(data) < vm2day:
+            return fixFunc(p, capacity, volumeMorto=vm1)
+        else:
+            return fixFunc(p, capacity, volumeMorto=vm1+vm2)
+    else:
+        return p
+
+
+
+reverseDate = lambda x: '.'.join(x.split('-')[::-1])
+def humanReadableDates(f):
+    def decorator(dataframes,*args,**kwargs):
+        import pandas as pd
+        copias = []
+        for i, x in enumerate(dataframes):
+            if type(x) == pd.core.frame.DataFrame or type(x) == pd.core.series.Series:
+                copias.append(x.copy())
+                copias[i].index = map(reverseDate, x.index)
+        #print (copias)
+        return f(copias,*args,**kwargs)
+    return decorator
+
+
+@humanReadableDates
 def plotSideBySide(dfTupl, cm=['Spectral', 'coolwarm'], titles=[None, None]):
     import matplotlib.pyplot as plt
     fig, axes = plt.subplots(1,2, figsize=(17,5))
@@ -53,46 +118,3 @@ def plotSideBySide(dfTupl, cm=['Spectral', 'coolwarm'], titles=[None, None]):
     plt.show()
 
 
-def fixPercent(p, data, log=True, sistema='Cantareira'):
-    """corrige o percentual divulgado pela sabesp"""
-
-    def str2date(data, format='%Y-%m-%d'):
-        """converte uma string contendo uma data e retorna um objeto date"""
-        import datetime as dt
-        return dt.datetime.strptime(data,format)
-
-
-    def percReal(a,volumeMorto=0):
-        volMax = 982.07
-        volAtual = volMax*(a/100) -volumeMorto
-        b = 100*volAtual/volMax
-        import numpy as np
-        b = np.round(b,1)
-        if log:
-            print('%s: %5.1f ===> %5.1f  VOLUME MORTO %5.1f (bi L)' % \
-            (data, a, b, volumeMorto))
-        return b
-
-    if sistema == 'Cantareira':
-
-        vm1day = str2date('16/05/2014', format='%d/%m/%Y')
-        vm2day = str2date('24/10/2014', format='%d/%m/%Y')
-
-        vm1 = 182.5
-        vm2 = 105.4
-
-        if str2date(data) < vm1day:
-            perc = percReal(p)
-            return perc
-
-        elif str2date(data) < vm2day:
-            perc = percReal(p, volumeMorto=vm1)
-            return perc
-
-        else:
-            perc = percReal(p, volumeMorto=vm1+vm2)
-            return perc
-
-
-if __name__ == '__main__':
-    pass
