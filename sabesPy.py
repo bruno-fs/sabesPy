@@ -4,8 +4,8 @@
 
 def getData(date):
     """recebe um objeto date ou uma string com a data no
-    formato YYYY-MM-DD e retorna uma 'SÃ©rie' (do pacote pandas)
-    com os nÃ­veis dos reservatÃ³rios da sabesp"""
+    formato YYYY-MM-DD e retorna uma 'Série' (do pacote pandas)
+    com os níveis dos reservatórios da sabesp"""
 
     fixPercent = lambda s: float(s.replace(",",".").replace("%",""))
 
@@ -13,7 +13,7 @@ def getData(date):
     if type(date) == datetime.date:
         date = date.isoformat()
 
-    ## requisiÃ§Ã£o
+    ## requisição
     import urllib.request
     req = urllib.request.urlopen("https://sabesp-api.herokuapp.com/" + date).read().decode()
 
@@ -29,14 +29,15 @@ def getData(date):
     return pd.Series(dados, index=sistemas, name=date)
 
 
-def plotSideBySide(dfTupl, cm=['Spectral', 'coolwarm']):
+def plotSideBySide(dfTupl, cm=['Spectral', 'coolwarm'], titles=[None, None]):
     import matplotlib.pyplot as plt
     fig, axes = plt.subplots(1,2, figsize=(17,5))
 
     for i, ax in enumerate(axes):
         dfTupl[i].ix[:].T.plot(
             kind='bar', ax=ax,
-            rot=0, colormap=cm[i])
+            rot=0, colormap=cm[i],
+            title=titles[i])
 
 
         for j in range(len(dfTupl[i].columns)):
@@ -50,7 +51,6 @@ def plotSideBySide(dfTupl, cm=['Spectral', 'coolwarm']):
                 fontsize=14, color='k')
 
     plt.show()
-
 
 
 def fixPercent(p, data, log=True, sistema='Cantareira'):
@@ -69,7 +69,8 @@ def fixPercent(p, data, log=True, sistema='Cantareira'):
         import numpy as np
         b = np.round(b,1)
         if log:
-            print('%s: %5.1f ===> %5.1f  VOLUME MORTO %5.1f (bi L)' % (data, a, b, volumeMorto))
+            print('%s: %5.1f ===> %5.1f  VOLUME MORTO %5.1f (bi L)' % \
+            (data, a, b, volumeMorto))
         return b
 
     if sistema == 'Cantareira':
